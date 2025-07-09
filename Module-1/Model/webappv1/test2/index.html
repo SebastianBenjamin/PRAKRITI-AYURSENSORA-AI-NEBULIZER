@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prakriti ML - Dosha Analysis</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="firebase-config.js"></script>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="page active">
+        <div class="container">
+            <h2>Login</h2>
+            <form id="login-form">
+                <input type="text" id="login-device-number" placeholder="Device Number" required>
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit">Login</button>
+                <p>Don't have an account? <a href="#" id="show-register">Register</a></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Register Page -->
+    <div id="register-page" class="page">
+        <div class="container">
+            <h2>Register</h2>
+            <form id="register-form">
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <input type="number" id="register-age" placeholder="Age" required>
+                <button type="button" id="analyze-btn">Analyze Dosha</button>
+                <button type="submit" id="register-btn" style="display:none;">Register</button>
+            </form>
+            <div id="dosha-chart-container" style="display:none;">
+                <canvas id="dosha-chart"></canvas>
+                <button id="recheck-dosha">Recheck Dosha</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard-page" class="page">
+        <div class="container">
+            <h2>Dashboard</h2>
+            <div class="device-status">
+                <label>Device Status:</label>
+                <input type="checkbox" id="device-status-toggle">
+            </div>
+            <div class="dosha-info">
+                <h3>Your Dosha</h3>
+                <p id="user-dosha"></p>
+                <button id="recheck-dosha-dashboard">Recheck Dosha</button>
+            </div>
+            <div class="spray-control">
+                <label>Spray Delay (1-100 mins):</label>
+                <input type="number" id="spray-delay" min="1" max="100">
+                <button id="spray-now-btn">Spray Now</button>
+            </div>
+            <div class="last-update">
+                <p>Last Update: <span id="last-update-time"></span></p>
+            </div>
+            <button id="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <!-- Modal for Messages -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <p id="modal-message"></p>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+</html>

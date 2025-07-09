@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prakriti Dashboard</title>
+  <style>
+    body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f4f4f4;
+}
+
+.page {
+  text-align: center;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.hidden {
+  display: none;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+input, button {
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #007bff;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+}
+#loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 5px;
+}
+  </style>
+
+</head>
+<body>
+  <!-- Login Page -->
+  <div id="login-page" class="page">
+    <h1>Login</h1>
+    <form id="login-form">
+      <input type="text" id="device-number" placeholder="Device Number" required>
+      <input type="email" id="email" placeholder="Email" required>
+      <input type="password" id="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+    </form>
+    <p>Don't have an account? <a href="#" id="go-to-register">Register</a></p>
+  </div>
+
+  <!-- Register Page -->
+  <div id="register-page" class="page hidden">
+    <h1>Register</h1>
+    <form id="register-form">
+      <input type="email" id="reg-email" placeholder="Email" required>
+      <input type="password" id="reg-password" placeholder="Password" required>
+      <input type="number" id="age" placeholder="Age" required>
+      <button type="button" id="analyze-btn">Analyze</button>
+      <div id="dosha-form" class="hidden">
+        <!-- Dosha Questions will be dynamically inserted here -->
+      </div>
+      <button type="submit" id="register-btn" class="hidden">Register</button>
+      <button type="button" id="recheck-btn" class="hidden">Recheck</button>
+    </form>
+    <p>Already have an account? <a href="#" id="go-to-login">Login</a></p>
+  </div>
+
+  <!-- Dashboard Page -->
+  <div id="dashboard-page" class="page hidden">
+    <h1>Dashboard</h1>
+    <div id="device-status">
+      <p>Device Status: <span id="status-text">Inactive</span></p>
+      <label class="switch">
+        <input type="checkbox" id="status-switch">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="dosha-info">
+      <p>Your Dosha: <span id="dosha-text"></span></p>
+      <button id="recheck-dosha">Recheck Dosha</button>
+    </div>
+    <div id="spray-delay">
+      <p>Spray Delay: <input type="number" id="delay-input" min="1" max="100"> minutes</p>
+      <button id="update-delay">Update Delay</button>
+    </div>
+    <div id="spray-now">
+      <button id="spray-btn">Spray Now</button>
+    </div>
+    <button id="logout-btn">Logout</button>
+  </div>
+
+  <!-- Modals -->
+  <!-- Success Modal -->
+<div id="success-modal" class="modal hidden">
+    <div class="modal-content">
+      <p id="success-message"></p> <!-- Ensure this ID matches -->
+      <button id="close-success-modal">Close</button>
+    </div>
+  </div>
+  
+  <!-- Error Modal -->
+  <div id="error-modal" class="modal hidden">
+    <div class="modal-content">
+      <p id="error-message"></p> <!-- Ensure this ID matches -->
+      <button id="close-error-modal">Close</button>
+    </div>
+  </div>
+  <div id="loading" class="hidden">Loading...</div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js";
+import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-database.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAgPbK7eGIWpq9Fe9IuP8lu6AslkXjSw-g",
+  authDomain: "prakriti-ml.firebaseapp.com",
+  databaseURL: "https://prakriti-ml-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "prakriti-ml",
+  storageBucket: "prakriti-ml.firebasestorage.app",
+  messagingSenderId: "228591322840",
+  appId: "1:228591322840:web:5ca85186487477c2cd39ad",
+  measurementId: "G-400WKJ325J"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+// DOM Elements
+const loginPage = document.getElementById('login-page');
+const registerPage = document.getElementById('register-page');
+const dashboardPage = document.getElementById('dashboard-page');
+const loginForm = document.getElementById('login-form');
+const registerForm = document.getElementById('register-form');
+const analyzeBtn = document.getElementById('analyze-btn');
+const recheckBtn = document.getElementById('recheck-btn');
+const registerBtn = document.getElementById('register-btn');
+const doshaForm = document.getElementById('dosha-form');
+const statusSwitch = document.getElementById('status-switch');
+const sprayBtn = document.getElementById('spray-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const successModal = document.getElementById('success-modal');
+const errorModal = document.getElementById('error-modal');
+const delayInput = document.getElementById('delay-input');
+const doshaText = document.getElementById('dosha-text');
+const statusText = document.getElementById('status-text');
+
+// Event Listeners
+loginForm.addEventListener('submit', loginUser);
+registerForm.addEventListener('submit', registerUser);
+analyzeBtn.addEventListener('click', analyzeDosha);
+recheckBtn.addEventListener('click', resetDoshaForm);
+statusSwitch.addEventListener('change', updateDeviceStatus);
+sprayBtn.addEventListener('click', triggerSpray);
+logoutBtn.addEventListener('click', logoutUser);
+document.getElementById('go-to-register').addEventListener('click', goToRegister);
+document.getElementById('go-to-login').addEventListener('click', goToLogin);
+document.getElementById('close-success-modal').addEventListener('click', () => successModal.classList.add('hidden'));
+document.getElementById('close-error-modal').addEventListener('click', () => errorModal.classList.add('hidden'));
+
+// Questions for Dosha Analysis
+const questions = [
+  { question: "How would you describe your general body type?", options: ["Lean and athletic", "Medium build, muscular", "Sturdy, broad"] },
+  { question: "What is your typical body temperature?", options: ["Feel cold often", "Feel warm", "Feel cold or sluggish"] },
+  { question: "How do you generally feel emotionally?", options: ["Anxious, nervous", "Passionate, determined", "Calm, stable"] },
+  { question: "What is your digestion like?", options: ["Irregular appetite", "Strong appetite", "Steady appetite"] },
+  { question: "How do you sleep?", options: ["Difficulty falling asleep", "Sleep soundly", "Sleep deeply"] },
+  { question: "How do you handle stress?", options: ["Restless, anxious", "Irritated, angry", "Down, withdrawn"] },
+  { question: "How would you describe your skin?", options: ["Dry, rough", "Oily, sensitive", "Smooth, thick"] },
+  { question: "What is your energy level like throughout the day?", options: ["Bursts of energy", "Steady energy", "Stable but slow"] },
+  { question: "How do you react to change or new environments?", options: ["Anxious, overwhelmed", "Adapt quickly", "Resist change"] },
+  { question: "How is your concentration and mental clarity?", options: ["Trouble focusing", "Sharp, focused", "Stable but cloudy"] }
+];
+
+// Initialize Dosha Form
+function initializeDoshaForm() {
+  doshaForm.innerHTML = questions.map((q, i) => `
+    <div>
+      <p>${q.question}</p>
+      ${q.options.map((opt, j) => `
+        <label>
+          <input type="radio" name="q${i}" value="${['Vata', 'Pitta', 'Kapha'][j]}"> ${opt}
+        </label>
+      `).join('')}
+    </div>
+  `).join('');
+  doshaForm.classList.remove('hidden');
+  analyzeBtn.classList.add('hidden');
+  registerBtn.classList.remove('hidden');
+  recheckBtn.classList.remove('hidden');
+}
+
+// Analyze Dosha
+function analyzeDosha() {
+  initializeDoshaForm();
+}
+
+// Reset Dosha Form
+function resetDoshaForm() {
+  doshaForm.innerHTML = '';
+  doshaForm.classList.add('hidden');
+  registerBtn.classList.add('hidden');
+  recheckBtn.classList.add('hidden');
+  analyzeBtn.classList.remove('hidden');
+}
+
+// Calculate Dosha
+function calculateDosha() {
+  const answers = Array.from(document.querySelectorAll('input[type="radio"]:checked')).map(input => input.value);
+  const doshaCount = { Vata: 0, Pitta: 0, Kapha: 0 };
+  answers.forEach(answer => doshaCount[answer]++);
+  return Object.keys(doshaCount).reduce((a, b) => doshaCount[a] > doshaCount[b] ? a : b);
+}
+
+function showLoading() {
+  document.getElementById('loading').classList.remove('hidden');
+}
+
+function hideLoading() {
+  document.getElementById('loading').classList.add('hidden');
+}
+
+// Example usage in loginUser
+function loginUser(e) {
+  e.preventDefault();
+  showLoading();
+  const deviceNumber = document.getElementById('device-number').value;
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+
+  signInWithEmailAndPassword(auth, email, password)
+    .then((userCredential) => {
+      const user = userCredential.user;
+      checkDeviceAvailability(deviceNumber, user.uid, email, password);
+    })
+    .catch((error) => {
+      showError(error.message);
+    })
+    .finally(() => {
+      hideLoading();
+    });
+}
+
+// Check Device Availability
+function checkDeviceAvailability(deviceNumber, userId, email, password) {
+  const deviceRef = ref(db, `Devices/Device${deviceNumber}`);
+  get(deviceRef).then((snapshot) => {
+    if (snapshot.exists() && !snapshot.val().User) {
+      allocateDevice(deviceNumber, userId, email, password);
+    } else {
+      showError("Device is already allocated or does not exist.");
+    }
+  });
+}
+
+// Allocate Device
+function allocateDevice(deviceNumber, userId, email, password) {
+  const updates = {
+    User: userId,
+    Status: "Active",
+    Dosha: "Pitta", // Default, will be updated from user data
+    SprayDelay: 5,
+    LastUpdate: new Date().toLocaleTimeString(),
+    Spray: 0
+  };
+  update(ref(db, `Devices/Device${deviceNumber}`), updates)
+    .then(() => {
+      set(ref(db, `Users/${userId}`), {
+        UserEmail: email,
+        UserPassword: password,
+        DeviceNumber: deviceNumber
+      }).then(() => {
+        showSuccess("Login successful!");
+        goToDashboard(deviceNumber, userId);
+      });
+    });
+}
+
+// Register User
+function registerUser(e) {
+  e.preventDefault();
+  const email = document.getElementById('reg-email').value;
+  const password = document.getElementById('reg-password').value;
+  const age = document.getElementById('age').value;
+  const dosha = calculateDosha();
+
+  createUserWithEmailAndPassword(auth, email, password)
+    .then((userCredential) => {
+      const user = userCredential.user;
+      set(ref(db, `Users/${user.uid}`), {
+        UserEmail: email,
+        UserPassword: password,
+        Dosha: dosha,
+        Age: age
+      }).then(() => {
+        showSuccess("Registration successful!");
+        goToLogin();
+      });
+    })
+    .catch((error) => {
+      showError(error.message);
+    });
+}
+
+// Update Device Status
+function updateDeviceStatus() {
+  const deviceNumber = localStorage.getItem('deviceNumber');
+  const status = statusSwitch.checked ? "Active" : "Inactive";
+  update(ref(db, `Devices/Device${deviceNumber}`), { Status: status, LastUpdate: new Date().toLocaleTimeString() });
+  statusText.textContent = status;
+}
+
+// Trigger Spray
+function triggerSpray() {
+  const deviceNumber = localStorage.getItem('deviceNumber');
+  const sprayValue = sprayBtn.textContent === "Spray Now" ? 1 : 0;
+  update(ref(db, `Devices/Device${deviceNumber}`), { Spray: sprayValue, LastUpdate: new Date().toLocaleTimeString() });
+  sprayBtn.textContent = sprayValue ? "Stop Spray" : "Spray Now";
+  sprayBtn.style.backgroundColor = sprayValue ? "green" : "lightcoral";
+}
+
+// Logout User
+function logoutUser() {
+  const deviceNumber = localStorage.getItem('deviceNumber');
+  update(ref(db, `Devices/Device${deviceNumber}`), { User: null, Status: "Inactive", Spray: 0 });
+  signOut(auth).then(() => {
+    localStorage.removeItem('deviceNumber');
+    localStorage.removeItem('userId');
+    goToLogin();
+  });
+}
+
+// Function to show success modal
+function showSuccess(message) {
+  document.getElementById('success-message').textContent = message; // Ensure this ID matches
+  document.getElementById('success-modal').classList.remove('hidden');
+}
+
+// Function to show error modal
+function showError(message) {
+  document.getElementById('error-message').textContent = message; // Ensure this ID matches
+  document.getElementById('error-modal').classList.remove('hidden');
+}
+
+// Navigate to Register Page
+function goToRegister() {
+  loginPage.classList.add('hidden');
+  registerPage.classList.remove('hidden');
+}
+
+// Navigate to Login Page
+function goToLogin() {
+  registerPage.classList.add('hidden');
+  loginPage.classList.remove('hidden');
+}
+
+// Navigate to Dashboard
+function goToDashboard(deviceNumber, userId) {
+  loginPage.classList.add('hidden');
+  registerPage.classList.add('hidden');
+  dashboardPage.classList.remove('hidden');
+  localStorage.setItem('deviceNumber', deviceNumber);
+  localStorage.setItem('userId', userId);
+  loadDashboardData(deviceNumber, userId);
+}
+
+// Load Dashboard Data
+function loadDashboardData(deviceNumber, userId) {
+  const deviceRef = ref(db, `Devices/Device${deviceNumber}`);
+  const userRef = ref(db, `Users/${userId}`);
+
+  onValue(deviceRef, (snapshot) => {
+    const data = snapshot.val();
+    statusSwitch.checked = data.Status === "Active";
+    statusText.textContent = data.Status;
+    delayInput.value = data.SprayDelay;
+    sprayBtn.textContent = data.Spray ? "Stop Spray" : "Spray Now";
+    sprayBtn.style.backgroundColor = data.Spray ? "green" : "lightcoral";
+  });
+
+  onValue(userRef, (snapshot) => {
+    const data = snapshot.val();
+    doshaText.textContent = data.Dosha;
+  });
+}
+
+// Check if User is Already Logged In
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    const deviceNumber = localStorage.getItem('deviceNumber');
+    const userId = localStorage.getItem('userId');
+    if (deviceNumber && userId) {
+      goToDashboard(deviceNumber, userId);
+    }
+  }
+});
+  </script>
+</body>
+</html>

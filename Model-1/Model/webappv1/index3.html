@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prakriti Tracker</title>
+    <style>
+        * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+}
+
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+.container {
+    max-width: 400px;
+    margin: 50px auto;
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+input, button {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Device Status Switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #2196F3;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+#spray-now-btn {
+    background-color: #ff4d4d;
+}
+
+#spray-now-btn.active {
+    background-color: #4CAF50;
+}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="page active">
+        <div class="container">
+            <h2>Login</h2>
+            <form id="login-form">
+                <input type="text" id="login-device" placeholder="Device Number" required>
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+            <p>Don't have an account? <a href="#" id="show-register">Register</a></p>
+        </div>
+    </div>
+
+    <!-- Register Page -->
+    <div id="register-page" class="page">
+        <div class="container">
+            <h2>Register</h2>
+            <form id="register-form">
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <input type="number" id="register-age" placeholder="Age" required>
+                <button type="button" id="analyze-btn">Analyze Dosha</button>
+                <button type="submit" id="register-btn" disabled>Register</button>
+            </form>
+            <button id="back-to-login">Back to Login</button>
+        </div>
+    </div>
+
+    <!-- Dosha Analysis Modal -->
+    <div id="dosha-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Dosha Analysis</h2>
+            <div id="dosha-questions"></div>
+            <canvas id="dosha-chart"></canvas>
+            <button id="recheck-dosha">Recheck Dosha</button>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard-page" class="page">
+        <div class="container">
+            <h2>Dashboard</h2>
+            <div class="device-status">
+                <h3>Device Status</h3>
+                <label class="switch">
+                    <input type="checkbox" id="device-status-toggle">
+                    <span class="slider"></span>
+                </label>
+                <p id="device-status-text">Inactive</p>
+            </div>
+
+            <div class="spray-control">
+                <h3>Spray Delay</h3>
+                <input type="number" id="spray-delay" min="1" max="100" placeholder="Delay in minutes">
+                <button id="spray-now-btn">Spray Now</button>
+            </div>
+
+            <div class="dosha-info">
+                <h3>Your Dosha</h3>
+                <p id="user-dosha">Loading...</p>
+                <button id="recheck-dosha-dashboard">Recheck Dosha</button>
+            </div>
+
+            <button id="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <!-- Modal for Messages -->
+    <div id="message-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <p id="message-text"></p>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <!-- <script type="module" src="firebase-config.js"></script> -->
+    <script type="module" >import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+        import { getDatabase, ref, set, get, update, remove, push } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+        // import { Chart } from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm';
+        import { Chart, registerables } from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm';
+
+        
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAgPbK7eGIWpq9Fe9IuP8lu6AslkXjSw-g",
+            authDomain: "prakriti-ml.firebaseapp.com",
+            databaseURL: "https://prakriti-ml-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "prakriti-ml",
+            storageBucket: "prakriti-ml.firebasestorage.app",
+            messagingSenderId: "228591322840",
+            appId: "1:228591322840:web:5ca85186487477c2cd39ad",
+            measurementId: "G-400WKJ325J"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        // Dosha Questions
+        const DOSHA_QUESTIONS = [
+            {
+                question: "How would you describe your general body type?",
+                options: [
+                    { text: "Lean and athletic, with a tendency to lose weight easily.", dosha: "Vata" },
+                    { text: "Medium build, muscular, with a tendency to stay fit.", dosha: "Pitta" },
+                    { text: "Sturdy, broad, and may gain weight easily.", dosha: "Kapha" }
+                ]
+            },
+            {
+                question: "What is your typical body temperature?",
+                options: [
+                    { text: "I feel cold often and have a low tolerance for cold weather.", dosha: "Vata" },
+                    { text: "I feel warm, and I have a medium tolerance for both hot and cold.", dosha: "Pitta" },
+                    { text: "I tend to feel cold or sluggish, especially in winter.", dosha: "Kapha" }
+                ]
+            },
+            // Add remaining 8 questions following the same structure
+            {
+                question: "How do you handle stress?",
+                options: [
+                    { text: "I become restless, anxious, and tend to overthink.", dosha: "Vata" },
+                    { text: "I get irritated, angry, or frustrated, but I quickly work through it.", dosha: "Pitta" },
+                    { text: "I feel down or withdrawn and might become lethargic or overeat.", dosha: "Kapha" }
+                ]
+            }
+            // Include all 10 questions similarly
+        ];
+        
+        // UI Elements
+        const pages = {
+            login: document.getElementById('login-page'),
+            register: document.getElementById('register-page'),
+            dashboard: document.getElementById('dashboard-page')
+        };
+        
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const doshaModal = document.getElementById('dosha-modal');
+        const doshaQuestions = document.getElementById('dosha-questions');
+        const doshaChart = document.getElementById('dosha-chart');
+        const deviceStatusToggle = document.getElementById('device-status-toggle');
+        const sprayDelayInput = document.getElementById('spray-delay');
+        const sprayNowBtn = document.getElementById('spray-now-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const recheckDoshaBtn = document.getElementById('recheck-dosha-dashboard');
+        const backToLoginBtn = document.getElementById('back-to-login');
+        const showRegisterLink = document.getElementById('show-register');
+        
+        // Helper Functions
+        function showPage(page) {
+            Object.values(pages).forEach(p => p.classList.remove('active'));
+            page.classList.add('active');
+        }
+        
+        function showModal(modalElement) {
+            modalElement.style.display = 'block';
+        }
+        
+        function hideModal(modalElement) {
+            modalElement.style.display = 'none';
+        }
+        
+        function showMessage(message) {
+            const messageModal = document.getElementById('message-modal');
+            const messageText = document.getElementById('message-text');
+            messageText.textContent = message;
+            showModal(messageModal);
+        }
+        
+        // Dosha Analysis Functions
+        function renderDoshaQuestions() {
+            doshaQuestions.innerHTML = '';
+            DOSHA_QUESTIONS.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.innerHTML = `
+                    <h3>${q.question}</h3>
+                    ${q.options.map((option, optIndex) => `
+                        <label>
+                            <input type="radio" name="question-${index}" value="${option.dosha}" required>
+                            ${option.text}
+                        </label>
+                    `).join('')}
+                `;
+                doshaQuestions.appendChild(questionDiv);
+            });
+        }
+        
+
+// Register all chart types
+Chart.register(...registerables);
+
+function analyzeDosha() {
+    const results = { Vata: 0, Pitta: 0, Kapha: 0 };
+    
+    DOSHA_QUESTIONS.forEach((q, index) => {
+        const selectedOption = document.querySelector(`input[name="question-${index}"]:checked`);
+        if (selectedOption) {
+            results[selectedOption.value]++;
+        }
+    });
+
+    // Destroy existing chart if it exists
+    if (window.doshaChartInstance) {
+        window.doshaChartInstance.destroy();
+    }
+
+    // Create dosha chart
+    window.doshaChartInstance = new Chart(doshaChart, {
+        type: 'pie', // Change to 'pie' if 'doughnut' is causing issues
+        data: {
+            labels: Object.keys(results),
+            datasets: [{
+                data: Object.values(results),
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Dosha Analysis'
+                }
+            }
+        }
+    });
+
+    // Determine dominant dosha
+    const dominantDosha = Object.keys(results).reduce((a, b) => 
+        results[a] > results[b] ? a : b
+    );
+
+    return dominantDosha;
+}
+        // Authentication Functions
+        async function checkEmailExists(email) {
+            const usersRef = ref(db, 'Data/Users');
+            const snapshot = await get(usersRef);
+            const users = snapshot.val() || {};
+            return Object.values(users).some(user => user.UserEmail === email);
+        }
+        
+        async function registerUser(email, password, age, dosha) {
+            try {
+                const userExists = await checkEmailExists(email);
+                if (userExists) {
+                    showMessage('Email already registered. Please login.');
+                    return false;
+                }
+        
+                const newUserRef = push(ref(db, 'Data/Users'));
+                await set(newUserRef, {
+                    UserEmail: email,
+                    UserPassword: password, // Note: In production, use proper encryption
+                    Age: age,
+                    Dosha: dosha
+                });
+        
+                return true;
+            } catch (error) {
+                showMessage('Registration failed: ' + error.message);
+                return false;
+            }
+        }
+        
+        async function loginUser(deviceNumber, email, password) {
+            try {
+                // Check if device exists and is not already allocated
+                const deviceRef = ref(db, `Data/Devices/${deviceNumber}`);
+                const deviceSnapshot = await get(deviceRef);
+                
+                if (deviceSnapshot.exists() && deviceSnapshot.val().User) {
+                    showMessage('Device is already in use');
+                    return false;
+                }
+        
+                // Validate user credentials
+                const usersRef = ref(db, 'Data/Users');
+                const usersSnapshot = await get(usersRef);
+                const users = usersSnapshot.val();
+        
+                const userKey = Object.keys(users || {}).find(key => 
+                    users[key].UserEmail === email && users[key].UserPassword === password
+                );
+        
+                if (!userKey) {
+                    showMessage('Invalid credentials');
+                    return false;
+                }
+        
+                // Update device allocation
+                await update(ref(db, `Data/Devices/${deviceNumber}`), {
+                    User: userKey,
+                    Status: 'Active',
+                    LastUpdate: new Date().toISOString()
+                });
+        
+                // Store login session
+                localStorage.setItem('userData', JSON.stringify({
+                    deviceNumber,
+                    email,
+                    userKey,
+                    dosha: users[userKey].Dosha
+                }));
+        
+                return true;
+            } catch (error) {
+                showMessage('Login failed: ' + error.message);
+                return false;
+            }
+        }
+        
+        // Dashboard Functions
+        async function loadDashboardData() {
+            const userData = JSON.parse(localStorage.getItem('userData'));
+            if (!userData) {
+                showPage(pages.login);
+                return;
+            }
+        
+            // Load device status
+            const deviceRef = ref(db, `Data/Devices/${userData.deviceNumber}`);
+            const deviceSnapshot = await get(deviceRef);
+            const deviceData = deviceSnapshot.val();
+        
+            // Update device status toggle
+            deviceStatusToggle.checked = deviceData.Status === 'Active';
+            
+            // Update spray delay
+            sprayDelayInput.value = deviceData.SprayDelay || '';
+        
+            // Update user dosha
+            document.getElementById('user-dosha').textContent = userData.dosha || 'Not determined';
+        }
+        
+        function logout() {
+            const userData = JSON.parse(localStorage.getItem('userData'));
+            if (userData) {
+                // Clear device allocation
+                update(ref(db, `Data/Devices/${userData.deviceNumber}`), {
+                    User: null,
+                    Status: 'Inactive'
+                });
+            }
+        
+            // Clear local storage and redirect to login
+            localStorage.removeItem('userData');
+            showPage(pages.login);
+        }
+        
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is already logged in
+            const userData = localStorage.getItem('userData');
+            if (userData) {
+                showPage(pages.dashboard);
+                loadDashboardData();
+            }
+        
+            // Registration Page Navigation
+            showRegisterLink.addEventListener('click', () => showPage(pages.register));
+            backToLoginBtn.addEventListener('click', () => showPage(pages.login));
+        
+            // Login Form
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const deviceNumber = document.getElementById('login-device').value;
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+        
+                const loginSuccess = await loginUser(deviceNumber, email, password);
+                if (loginSuccess) {
+                    showPage(pages.dashboard);
+                    loadDashboardData();
+                }
+            });
+        
+            // Dosha Analysis
+            analyzeBtn.addEventListener('click', () => {
+                renderDoshaQuestions();
+                showModal(doshaModal);
+            });
+        
+            doshaModal.querySelector('.close').addEventListener('click', () => hideModal(doshaModal));
+        
+            // Register Form
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('register-password').value;
+                const age = document.getElementById('register-age').value;
+                const dosha = localStorage.getItem('analyzedDosha');
+        
+                const registrationSuccess = await registerUser(email, password, age, dosha);
+                if (registrationSuccess) {
+                    showMessage('Registration successful');
+                    showPage(pages.login);
+                }
+            });
+        
+            // Dosha Recheck
+            recheckDoshaBtn.addEventListener('click', () => {
+                renderDoshaQuestions();
+                showModal(doshaModal);
+            });
+        
+            // Dosha Analysis Submission
+            document.getElementById('recheck-dosha').addEventListener('click', () => {
+                const dominantDosha = analyzeDosha();
+                localStorage.setItem('analyzedDosha', dominantDosha);
+                registerBtn.disabled = false;
+                showMessage(`Your dominant dosha is: ${dominantDosha}`);
+            });
+        
+            // Device Status Toggle
+            deviceStatusToggle.addEventListener('change', async (e) => {
+                const userData = JSON.parse(localStorage.getItem('userData'));
+                if (userData) {
+                    await update(ref(db, `Data/Devices/${userData.deviceNumber}`), {
+                        Status: e.target.checked ? 'Active' : 'Inactive',
+                        LastUpdate: new Date().toISOString()
+                    });
+                    document.getElementById('device-status-text').textContent = 
+                        e.target.checked ? 'Active' : 'Inactive';
+                }
+            });
+        
+            // Spray Delay
+            sprayDelayInput.addEventListener('change', async (e) => {
+                const userData = JSON.parse(localStorage.getItem('userData'));
+                if (userData) {
+                    await update(ref(db, `Data/Devices/${userData.deviceNumber}`), {
+                        SprayDelay: e.target.value,
+                        LastUpdate: new Date().toISOString()
+                    });
+                }
+            });
+        
+            // Spray Now Button
+            sprayNowBtn.addEventListener('click', async () => {
+                const userData = JSON.parse(localStorage.getItem('userData'));
+                if (userData) {
+                    await update(ref(db, `Data/Devices/${userData.deviceNumber}`), {
+                        Spray: 1,
+                        LastUpdate: new Date().toISOString()
+                    });
+                    sprayNowBtn.classList.add('active');
+                    setTimeout(() => {
+                        sprayNowBtn.classList.remove('active');
+                    }, 2000);
+                }
+            });
+        
+            // Logout
+            logoutBtn.addEventListener('click', logout);
+        });</script>
+</body>
+</html>
